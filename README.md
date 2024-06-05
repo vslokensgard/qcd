@@ -52,3 +52,11 @@ Parameters: NumPy table VALS:
             
 Returns:    1D NumPy array:
             Lists mean values of each input row
+
+### def jacknifeError(binned_data):
+Purpose:    calculate jacknife error across all bins for each timeslice
+Parameters: NumPy table BINNED_DATA:
+            rows representing timeslices,
+            columns representing bins
+Returns:    NumPy 1D array:
+            one error value per timeslice
