@@ -5,9 +5,9 @@ Depends on AstroPy, NumPy, and MatPlotLib
 ### def filesFromDir(keywords, path=None):
 Purpose:    extract file names containing keyword strings from a directory
 
-Parameters: list of keyword strings KEYWORDS
+Parameters: list of keyword strings KEYWORDS;
 
-            optional directory path string PATH
+            optional directory path string PATH;
             
             if no PATH given, searches the current directory
             
