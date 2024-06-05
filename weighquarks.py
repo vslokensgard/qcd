@@ -51,15 +51,16 @@ def mergeTables(file_list, names, selected):
 #             Columns represent jacknife bins
 #             Rows represent time slices
 def jacknifeBinData(data):
-    binned = np.copy(data)
+    binned = np.zeros(data.shape)
     num_slices, num_bins = data.shape
     
     for i in range(num_slices):
         row_sum = np.sum(data[i])
         
         for j in range(num_bins):
-            binned[i][j] = row_sum - data[i][j] / num_bins
+            binned[i][j] = row_sum - data[i][j]
       
+    binned /= (num_bins - 1)
     return binned
 
 # Purpose:    calculate effective energy from 2-point function values
@@ -112,8 +113,9 @@ def averageColumns(vals):
 def jacknifeError(binned_data):
     num_slices, num_bins = binned_data.shape
     m_factor = (num_bins - 1) / num_bins
-    delta_rho = np.zeros(binned_data.shape[0])
     rho_bars = wq.averageColumns(binned_data)
+    print(rho_bars[20])
+    delta_rho = np.zeros(num_slices)
     
     for slice_no in range(num_slices):
         rho_bar = rho_bars[slice_no]
@@ -122,6 +124,7 @@ def jacknifeError(binned_data):
         for bin_no in range(num_bins):
             diff = binned_data[slice_no][bin_no] - rho_bar
             sigma += np.square(diff)
-        delta_rho[slice_no] = np.sqrt(sigma)
-    
+            
+        delta_rho[slice_no] = np.sqrt(sigma * m_factor)
+
     return delta_rho
