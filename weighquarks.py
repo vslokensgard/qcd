@@ -8,15 +8,17 @@ import os
 
 # Purpose:    extract file names containing keyword strings from a directory
 # Parameters: list of keyword strings KEYWORDS
-#             optional directory path string PATH
+#             optional directory path string PATH (must end in a "/")
 #             if no PATH given, searches the current directory
 # Returns:    list of file name strings matching keywords in directory
 def filesFromDir(keywords, path=None):
+    
     if path:
-        all_files = os.listdir(path)
+        all_files = [(path + k) for k in os.listdir(path)]
+        
     else:
         all_files = os.listdir()
-    
+        
     subset = [k for k in all_files if any(keyword in k for keyword in keywords)]
     return subset
 
