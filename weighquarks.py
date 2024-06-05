@@ -102,3 +102,26 @@ def averageColumns(vals):
     avg /= num_trials
     
     return avg
+
+# Purpose:    calculate jacknife error across all bins for each timeslice
+# Parameters: NumPy table BINNED_DATA:
+#             rows representing timeslices,
+#             columns representing bins
+# Returns:    NumPy 1D array:
+#             one error value per timeslice
+def jacknifeError(binned_data):
+    num_slices, num_bins = binned_data.shape
+    m_factor = (num_bins - 1) / num_bins
+    delta_rho = np.zeros(binned_data.shape[0])
+    rho_bars = wq.averageColumns(binned_data)
+    
+    for slice_no in range(num_slices):
+        rho_bar = rho_bars[slice_no]
+        sigma = 0
+        
+        for bin_no in range(num_bins):
+            diff = binned_data[slice_no][bin_no] - rho_bar
+            sigma += np.square(diff)
+        delta_rho[slice_no] = np.sqrt(sigma)
+    
+    return delta_rho
