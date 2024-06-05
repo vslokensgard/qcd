@@ -113,8 +113,7 @@ def averageColumns(vals):
 def jacknifeError(binned_data):
     num_slices, num_bins = binned_data.shape
     m_factor = (num_bins - 1) / num_bins
-    rho_bars = wq.averageColumns(binned_data)
-    print(rho_bars[20])
+    rho_bars = averageColumns(binned_data)
     delta_rho = np.zeros(num_slices)
     
     for slice_no in range(num_slices):
