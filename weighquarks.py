@@ -110,11 +110,14 @@ def averageColumns(vals):
 #             columns representing bins
 # Returns:    NumPy 1D array:
 #             one error value per timeslice
-def jacknifeError(binned_data):
+def jacknifeError(binned_data, rho=None):
     num_slices, num_bins = binned_data.shape
     m_factor = (num_bins - 1) / num_bins
-    rho_bars = averageColumns(binned_data)
     delta_rho = np.zeros(num_slices)
+    if rho:
+        rho_bars = rho
+    else:
+        rho_bars = averageColumns(binned_data)
     
     for slice_no in range(num_slices):
         rho_bar = rho_bars[slice_no]
@@ -127,3 +130,54 @@ def jacknifeError(binned_data):
         delta_rho[slice_no] = np.sqrt(sigma * m_factor)
 
     return delta_rho
+
+# Purpose:    identify the first timeslice whose error exceeds a given threshold
+# Parameters: 1D Numpy array of error values JACKNIFE_ERR
+#             number MAX_FACT, product with the error of index 1 of JACKNIFE_ERR will set the threshold
+# Returns:    index of first value in JACKNIFE_ERR greater than the threshold, or 5, whichever is larger
+def maxSlice(jacknife_err, max_fact):
+    starting_length = len(jacknife_err)
+    err_threshold = jacknife_err[1] * max_fact
+    
+    for i in range(1, starting_length):
+        if jacknife_err[i] > err_threshold:
+            break
+    
+    if i < 5:
+        i = 5
+        
+    return i
+
+# Purpose:    graph effective energy values with jacknife error for each bin
+# Parameters: 2D NumPy array EFF_ENERGIES:
+#             rows represent timeslices,
+#             columns represent bins;
+#             1D NumPy array JACK_ERROR:
+#             represents error values associated with each bin value
+#             number ERR_CUTOFF representing max error as a factor of the error of JACK_ERROR[1]
+#             list of integers SELECTED_BINS, if not None then only graph listed indeces
+# Returns:    void
+def graphBins(eff_energies, jack_error, err_cutoff=None, selected_bins=None):
+    energies_by_bin = np.transpose(eff_energies)  
+    num_bins, num_intervals = energies_by_bin.shape
+    min_slice = 1
+    if err_cutoff:
+        max_slice = maxSlice(jack_error, err_cutoff)
+    else:
+        max_slice = num_intervals
+    
+    x = range(min_slice, max_slice)
+    jack_error = jack_error[min_slice:max_slice]
+    
+    if selected_bins:
+        to_plot = selected_bins
+    else:
+        to_plot = list(range(num_bins))
+    
+    for bin_no in to_plot:
+        y = energies_by_bin[bin_no][min_slice:max_slice]
+        plt.scatter(x, y)
+        plt.errorbar(x, y, yerr=jack_error, fmt="o")
+        plt.show()
+        
+    return
