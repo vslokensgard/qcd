@@ -247,7 +247,7 @@ def jacknifeError1D(rhos, avg=None):
     if avg:
         rho_bar = avg
     else:
-        rho_bar = np.sum(rhos) / len(rhos)
+        rho_bar = np.mean(rhos)
         
     m_fact = (len(rhos) - 1) / len(rhos)
     sig_fact = np.sum( np.square(rhos - rho_bar) )
@@ -432,3 +432,39 @@ def altFits2D(binned, err, show=False, mode=0, selected_bins=None, length=3, max
             fit_vals.append(altFits1D(bin_data, err, plateau_min, plateau_max, delta_fact, show=show)[0])
       
     return fit_vals
+
+# Purpose: list ground state value & error from a raw data table
+def getGroundState(data, mode=0):
+    twoptf = jacknifeAverage(data)
+    energy = effectiveEnergy(twoptf)
+    err = jacknifeError2D(energy)
+    vals = altFits2D(energy, err, mode=mode, delta_fact=None)
+    avg = np.mean(vals)
+    dev = jacknifeError1D(vals, avg=avg)
+    return (avg, dev)
+
+# Purpose: collate average & error values across momenta
+def listGroundStates(data_tables, selected_col, mode=0):
+    momentum_points = np.zeros((2,len(data_tables)))
+    for i in range(len(data_tables)):
+        data = mergeTables(data_tables[i], col_names, selected_col)
+        momentum_points[0][i], momentum_points[1][i] = getGroundState(data, mode=mode)    
+    
+    return momentum_points
+
+def plotDispersion(momenta, vals_by_param):
+    plot_title = "Energy vs. momentum"
+    x = momenta
+    y = vals_by_param[0]
+    e = vals_by_param[1]
+    
+    fit = np.polyfit(x, y, 2)
+    fit_func = np.poly1d(fit)
+    polyline = np.linspace(0, len(momenta), 100)
+    plt.scatter(x, y)
+    plt.errorbar(x, y, yerr=e, fmt="o")
+    plt.plot(polyline, fit_func(polyline)) 
+    
+    plt.show() 
+    print(str(fit_func))
+    return
