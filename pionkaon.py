@@ -318,7 +318,8 @@ def plotPlateauFit(ycoords, yerr, min_slice, max_slice, delta=None, show=False):
 #             number VARIED_BOUIND representing the boundary point whose alternatives will be calculated
 #             number STATIC_BOUND representing the boundary point (min or max slice) that will be held constant
 #             optional number FRAC_DELTA representing the minimum error window as a percentage of the average value
-# Returns:    the maximum or minimum boundary point (time slice index) whose average falls within the margin of error
+#             optional boolean SHOW, if true alternate fit plots will display
+# Returns:    two-element list where element 0 is the final mean and element 1 is the error bound
 def altFits1D(coords, err, static_bound, varied_bound, frac_delta=None, show=False):
     if varied_bound <= static_bound:
         rho_bar = getPlateauFit(coords, err, varied_bound, static_bound)
@@ -329,11 +330,11 @@ def altFits1D(coords, err, static_bound, varied_bound, frac_delta=None, show=Fal
             #return -1
             junk_flag = True
             return None
-        
+
         if not plotPlateauFit(coords, err, varied_bound, static_bound, show=show):
             junk_flag = True
             return None
-        
+
         bound = delta_e
         if frac_delta:
             if (delta_e/rho_bar < frac_delta):
@@ -367,7 +368,7 @@ def altFits1D(coords, err, static_bound, varied_bound, frac_delta=None, show=Fal
 
         if not plotPlateauFit(coords, err, static_bound, varied_bound, show=show):
             return None
-        
+
         if (delta_e/rho_bar < frac_delta):
             bound = rho_bar * frac_delta
         else:
@@ -401,10 +402,7 @@ def altFits1D(coords, err, static_bound, varied_bound, frac_delta=None, show=Fal
 #             optional boolean parameters VARY_MIN, if true then vary the minimum slice index
 #             optional boolean parameters VARY_MAX, if true then vary the maximum slice index
 #             optional number DELTA_FACT representing the minimum error window as a percentage of the average value
-# Returns:    dictionary storing results of altFits1D() for the selected bins:
-#             key "plateau" for minimum bound of plateau;
-#             key "min" for minimum bound when minimum slice is adjusted down within margin of error;
-#             key "max" for maximum bound when maximum slice is adjusted up within margin of error
+# Returns:    list storing non-null results of altFits1D() for the selected bins
 def altFits2D(binned, err, show=False, mode=0, selected_bins=None, length=3, max_fact=10, delta_fact=None):
     sort_by_bin = np.transpose(binned)
 
@@ -432,29 +430,49 @@ def altFits2D(binned, err, show=False, mode=0, selected_bins=None, length=3, max
 
     return np.array(fit_vals)
 
-# Purpose: list ground state value & error from a raw data table
-def getGroundState(data, show=False, mode=0, selected_bins=None, length=3, max_fact=10, delta_fact=None):
+# Purpose:    list ground state value & error from a raw data table
+# Parameters: 2D NumPy array representing the raw data, where rows represent timeslices and columns represent configurations
+#             optional boolean SHOW, toggles whether plots representing individual bins will display
+#             optional int MODE:
+#                 mode 0 will set the minimum slice to the first plateau point and the maximum to the first point whose error is over MAX_FACT;
+#                 mode 1 will lower the minimum slice until the average is outside the margin of error;
+#                 mode 2 will raise the maximum slice until the average is outside the margin of error.
+#             optional list SELECTED_BINS representing the indeces of bins to test alternate fits for; if None, then test all
+#             optional int LENGTH, representing the minimum length of a plateau
+#             optional number MAX_FACT representing the error cutoff for the maximum slice as a multiple of the error for index 1 of its bin
+#             optional number DELTA_FACT, the minimum margin of error for testing alternate fits as a multiple of the average
+def getGroundState(data, show=False, mode=1, selected_bins=None, length=3, max_fact=10, delta_fact=0.05):
     twoptf = jacknifeAverage(data)
     energy = effectiveEnergy(twoptf)
     err = jacknifeError2D(energy)
     vals = altFits2D(energy, err, show=show, mode=mode, selected_bins=selected_bins, length=length, max_fact=max_fact, delta_fact=delta_fact)
-    
+
     if junk_flag:
         print("Warning: data contains junk values")
-        
+
     if vals:
         avg = np.mean(vals)
         dev = jacknifeError1D(vals, avg=avg)
     else:
         return None
-    
+
     return avg, dev
 
-# Series of (momentum, keyword) list tuples
-def listGroundStates(p, path, col_index, mode=0, delta_fact=0.05):
+# Purpose:    wrapper function for getGroundState() to find ground states for multiple momentum values
+# Parameters: list of tuples P:
+#                 element in the first position is an integer representing a momentum value;
+#                 element in the second position is a list of string keywords associated with the files for that momentum value
+#             int COL_INDEX representing the index of the column storing the real part of the 2-point function
+#             for keyword args, see getGroundState()
+# Returns:    2D NumPy array where each row represents a momentum value:
+#                 column 0 represents momentum;
+#                 column 1 represents its average value;
+#                 column 2 represents its jacknife error;
+#                 columns 1 and 2 are set to None if data contains junk values or calculations failed
+def listGroundStates(p, path, col_index, show=False, mode=1, selected_bins=None, length=3, max_fact=10, delta_fact=0.05):
     junk_flag = False
     ground_states = np.zeros((len(p),3))
-    
+
     for i in range(len(p)):
         file_list = searchDir(p[i][1], path=path)
         data_table = mergeTables(file_list, col_index)
@@ -466,17 +484,18 @@ def listGroundStates(p, path, col_index, mode=0, delta_fact=0.05):
         else:
             ground_states[i][1] = None
             ground_states[i][2] = None
-            
+
     return ground_states
 
-def plotDispersion(vals_by_state):
-    vals_by_param = np.transpose(vals_by_state)
-    
+# Purpose:    plot and quadratic-fit a set of momenta with their average energies and error
+# Parameters: 2D NumPy array VALS_BY_STATE returned by listGroundStates()
+#             string SAVE_AS, path and file name where the dispersion relation plot will be saved
+# Returns:    void, dispersion relation plot and fit function saved to an external file
+def plotDispersion(vals_by_state, save_as):
+    if not vals_by_state:
+        return None
     for i in range(len(vals_by_state)):
-        if vals
-    
-    y = vals_by_param[0]
-    e = vals_by_param[1]
+        x[i], y[i], e[i] = vals_by_state[i]
 
     fit = np.polyfit(x, y, 2)
     fit_func = np.poly1d(fit)
@@ -484,7 +503,7 @@ def plotDispersion(vals_by_state):
     plt.scatter(x, y)
     plt.errorbar(x, y, yerr=e, fmt="o")
     plt.plot(polyline, fit_func(polyline))
+    plt.xlabel(str(fit_func))
 
-    plt.show()
-    print(str(fit_func))
+    plt.savefig(save_as)
     return
