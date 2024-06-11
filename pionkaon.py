@@ -1,10 +1,5 @@
-#from astropy.io import ascii
-#from astropy import table
-#from astropy.table import Table
-#from astropy.table import Column
 import numpy as np
 import matplotlib.pyplot as plt
-import os
 
 global junk_flag
 
@@ -25,25 +20,10 @@ def searchDir(keywords, path=None):
 
 # Purpose:    read list of input files to single data table
 # Parameters: list of file names to read FILE_LIST;
-#             list of table column name strings NAMES;
-#             string name of selected column SELECTED
+#             index of selected column COL_INDEX
 # Returns:    NumPy table of input data
 #             Columns represent input files
 #             Rows represent time slices
-#def mergeTables(file_list, names, selected):
-#    merged = []
-#
-#    # Add selected columns from each file to a single table
-#    for i in range(len(file_list)):
-#        current_file = ascii.read(file_list[i])
-#        current_table = Table(data=current_file, names=names)
-#        trial_data = Column(data=current_table[selected], name=str(i)).data
-#        merged.append(trial_data)
-#
-#    merged_array = np.asarray(merged)
-#    final_array = np.transpose(merged_array)
-#    return final_array
-
 def mergeTables(file_list, col_index):
         by_file = np.zeros((len(file_list),64))
 
@@ -275,7 +255,7 @@ def jacknifeError1D(rhos, avg=None):
 #             number MIN_SLICE representing the start slice of the plateau fit
 #             number MAX_SLICE representing the end slice of the plateau fit
 # Returns:    plateau fit value over the given slices;
-#             -1 if the selected data contains junk values
+#             None if the selected data contains junk values
 def getPlateauFit(ycoords, yerr, min_slice, max_slice):
     if np.any(ycoords[min_slice:max_slice] <= 0) or np.any(yerr[min_slice:max_slice] <= 0):
         junk_flag = True
@@ -378,16 +358,10 @@ def altFits1D(coords, err, static_bound, varied_bound, frac_delta=None, show=Fal
 
     else:
         rho_bar = getPlateauFit(coords, err, static_bound, varied_bound)
-
-        if rho_bar <= 0:
-            #print("Plateau fit from slices",static_bound,"to",varied_bound,"was not calculated due to junk values")
-            junk_flag = True
-            return None
-
         delta_e = jacknifeError1D(coords[varied_bound:static_bound], avg=rho_bar)
 
-        if delta_e <= 0:
-            #print("Plateau fit from slices",varied_bound,"to",static_bound,"was not calculated due to junk values")
+        if (rho_bar <= 0) or (delta_e <= 0):
+            #print("Plateau fit from slices",static_bound,"to",varied_bound,"was not calculated due to junk values")
             junk_flag = True
             return None
 
@@ -447,26 +421,33 @@ def altFits2D(binned, err, show=False, mode=0, selected_bins=None, length=3, max
         plateau_max = maxSlice(err, max_fact=max_fact)
 
         if mode == 0:
-            fit_vals.append(plotPlateauFit(bin_data, err, plateau_min, plateau_max)[0])
+            average = plotPlateauFit(bin_data, err, plateau_min, plateau_max, show=show)[0]
+            if average: fit_vals.append(average)
         if mode == 1:
             average = altFits1D(bin_data, err, plateau_max, plateau_min, delta_fact, show=show)[0]
-            if average:
-                fit_vals.append(average)
+            if average: fit_vals.append(average)
         if mode == 2:
             average = altFits1D(bin_data, err, plateau_min, plateau_max, delta_fact, show=show)[0]
-            if average:
-                fit_vals.append(average)
+            if average: fit_vals.append(average)
 
-    return fit_vals
+    return np.array(fit_vals)
 
 # Purpose: list ground state value & error from a raw data table
-def getGroundState(data, mode=0, delta_fact=None):
+def getGroundState(data, show=False, mode=0, selected_bins=None, length=3, max_fact=10, delta_fact=None):
     twoptf = jacknifeAverage(data)
     energy = effectiveEnergy(twoptf)
     err = jacknifeError2D(energy)
-    vals = altFits2D(energy, err, mode=mode, delta_fact=None)
-    avg = np.mean(vals)
-    dev = jacknifeError1D(vals, avg=avg)
+    vals = altFits2D(energy, err, show=show, mode=mode, selected_bins=selected_bins, length=length, max_fact=max_fact, delta_fact=delta_fact)
+    
+    if junk_flag:
+        print("Warning: data contains junk values")
+        
+    if vals:
+        avg = np.mean(vals)
+        dev = jacknifeError1D(vals, avg=avg)
+    else:
+        return None
+    
     return avg, dev
 
 # Series of (momentum, keyword) list tuples
@@ -477,19 +458,23 @@ def listGroundStates(p, path, col_index, mode=0, delta_fact=0.05):
     for i in range(len(p)):
         file_list = searchDir(p[i][1], path=path)
         data_table = mergeTables(file_list, col_index)
-        energy = getGroundState(data_table)
         ground_states[i][0] = p[i][0]
-        ground_states[i][1], ground_states[i][2] = getGroundState(data_table, mode=mode, delta_fact=delta_fact)
-        
-    if junk_flag:
-        print("Data contains junk values")
-        
+        avg, dev = getGroundState(data_table, mode=mode, delta_fact=delta_fact)
+        if avg and dev:
+            ground_states[i][1] = avg
+            ground_states[i][2] = dev
+        else:
+            ground_states[i][1] = None
+            ground_states[i][2] = None
+            
     return ground_states
 
-def plotDispersion(momenta, vals_by_state):
-    plot_title = "Energy vs. momentum"
+def plotDispersion(vals_by_state):
     vals_by_param = np.transpose(vals_by_state)
-    x = momenta
+    
+    for i in range(len(vals_by_state)):
+        if vals
+    
     y = vals_by_param[0]
     e = vals_by_param[1]
 
