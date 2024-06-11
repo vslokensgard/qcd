@@ -6,6 +6,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 
+global junk_flag
+
 # Purpose:    extract file names containing keyword strings from a directory
 # Parameters: list of keyword strings KEYWORDS
 #             optional directory path string PATH (must end in a "/")
@@ -87,8 +89,9 @@ def effectiveEnergy(bins):
     out_by_bin = np.zeros((num_bins, num_intervals))
 
     if (np.any(in_by_bin <= 0)):
-        print("Warning: binned data includes negative or zero values.")
-        print("Effective energies for these intervals will be set to 0.")
+        junk_flag = True
+        #print("Warning: binned data includes negative or zero values.")
+        #print("Effective energies for these intervals will be set to 0.")
 
     for bin_no in range(num_bins):
 
@@ -275,13 +278,12 @@ def jacknifeError1D(rhos, avg=None):
 #             -1 if the selected data contains junk values
 def getPlateauFit(ycoords, yerr, min_slice, max_slice):
     if np.any(ycoords[min_slice:max_slice] <= 0) or np.any(yerr[min_slice:max_slice] <= 0):
-        return -1
+        junk_flag = True
+        #print("Negative values")
+        return None
 
     num = np.sum(ycoords[min_slice:max_slice] * np.power(yerr[min_slice:max_slice], -2))
     den = np.sum(np.power(yerr[min_slice:max_slice], -2))
-    if (num == 0) or (den == 0):
-        return -1
-
     quo = num/den
     return quo
 
@@ -295,7 +297,7 @@ def getPlateauFit(ycoords, yerr, min_slice, max_slice):
 #             None if getPlateauFit() call fails
 def plotPlateauFit(ycoords, yerr, min_slice, max_slice, delta=None, show=False):
     plat_fit = getPlateauFit(ycoords, yerr, min_slice, max_slice)
-    if plat_fit < 0:
+    if not plat_fit:
         return None
 
     if delta:
@@ -340,17 +342,18 @@ def plotPlateauFit(ycoords, yerr, min_slice, max_slice, delta=None, show=False):
 def altFits1D(coords, err, static_bound, varied_bound, frac_delta=None, show=False):
     if varied_bound <= static_bound:
         rho_bar = getPlateauFit(coords, err, varied_bound, static_bound)
-
-        if rho_bar <= 0:
-            print("Plateau fit from slices",varied_bound,"to",static_bound,"was not calculated due to junk values")
-            return -1
-
         delta_e = jacknifeError1D(coords[varied_bound:static_bound], avg=rho_bar)
-        if delta_e <= 0:
-            print("Plateau fit from slices",varied_bound,"to",static_bound,"was not calculated due to junk values")
-            return -1
 
-        plotPlateauFit(coords, err, varied_bound, static_bound, show=show)
+        if (rho_bar <= 0) or (delta_e <= 0):
+            #print("Plateau fit from slices",varied_bound,"to",static_bound,"was not calculated due to junk values")
+            #return -1
+            junk_flag = True
+            return None
+        
+        if not plotPlateauFit(coords, err, varied_bound, static_bound, show=show):
+            junk_flag = True
+            return None
+        
         bound = delta_e
         if frac_delta:
             if (delta_e/rho_bar < frac_delta):
@@ -360,13 +363,15 @@ def altFits1D(coords, err, static_bound, varied_bound, frac_delta=None, show=Fal
             next_slice = varied_bound - 1
             include_next_plateau = getPlateauFit(coords, err, next_slice, static_bound)
             if include_next_plateau <= 0:
-                print("Plateau fit from slices",varied_bound,"to",static_bound,"was not calculated due to junk values")
-                return -1
+                #print("Plateau fit from slices",varied_bound,"to",static_bound,"was not calculated due to junk values")
+                #return -1
+                return [rho_bar, bound]
 
             if (rho_bar-bound) <= include_next_plateau <= (rho_bar+bound):
                 varied_bound = next_slice
                 rho_bar = getPlateauFit(coords, err, static_bound, varied_bound)
-                plotPlateauFit(coords, err, varied_bound, static_bound, delta=bound, show=show)
+                if not plotPlateauFit(coords, err, varied_bound, static_bound, delta=bound, show=show):
+                    return [rho_bar, bound]
 
             else:
                 return [rho_bar, bound]
@@ -375,16 +380,20 @@ def altFits1D(coords, err, static_bound, varied_bound, frac_delta=None, show=Fal
         rho_bar = getPlateauFit(coords, err, static_bound, varied_bound)
 
         if rho_bar <= 0:
-            print("Plateau fit from slices",static_bound,"to",varied_bound,"was not calculated due to junk values")
-            return -1
+            #print("Plateau fit from slices",static_bound,"to",varied_bound,"was not calculated due to junk values")
+            junk_flag = True
+            return None
 
         delta_e = jacknifeError1D(coords[varied_bound:static_bound], avg=rho_bar)
 
         if delta_e <= 0:
-            print("Plateau fit from slices",varied_bound,"to",static_bound,"was not calculated due to junk values")
-            return -1
+            #print("Plateau fit from slices",varied_bound,"to",static_bound,"was not calculated due to junk values")
+            junk_flag = True
+            return None
 
-        plotPlateauFit(coords, err, static_bound, varied_bound, show=show)
+        if not plotPlateauFit(coords, err, static_bound, varied_bound, show=show):
+            return None
+        
         if (delta_e/rho_bar < frac_delta):
             bound = rho_bar * frac_delta
         else:
@@ -395,13 +404,15 @@ def altFits1D(coords, err, static_bound, varied_bound, frac_delta=None, show=Fal
             include_next_plateau = getPlateauFit(coords, err, static_bound, next_slice)
 
             if include_next_plateau <= 0:
-                print("Plateau fit from slices",static_bound,"to",varied_bound,"was not calculated due to junk values")
-                return -1
+                #print("Plateau fit from slices",static_bound,"to",varied_bound,"was not calculated due to junk values")
+                #return -1
+                return [rho_bar, bound]
 
             if (rho_bar-bound) <= include_next_plateau <= (rho_bar+bound):
                 varied_bound = next_slice
                 rho_bar = getPlateauFit(coords, err, static_bound, varied_bound)
-                plotPlateauFit(coords, err, static_bound, varied_bound, delta=bound, show=show)
+                if not plotPlateauFit(coords, err, static_bound, varied_bound, delta=bound, show=show):
+                    return [rho_bar, bound]
 
             else:
                 return [rho_bar, bound]
@@ -438,33 +449,46 @@ def altFits2D(binned, err, show=False, mode=0, selected_bins=None, length=3, max
         if mode == 0:
             fit_vals.append(plotPlateauFit(bin_data, err, plateau_min, plateau_max)[0])
         if mode == 1:
-            fit_vals.append(altFits1D(bin_data, err, plateau_max, plateau_min, delta_fact, show=show)[0])
+            average = altFits1D(bin_data, err, plateau_max, plateau_min, delta_fact, show=show)[0]
+            if average:
+                fit_vals.append(average)
         if mode == 2:
-            fit_vals.append(altFits1D(bin_data, err, plateau_min, plateau_max, delta_fact, show=show)[0])
+            average = altFits1D(bin_data, err, plateau_min, plateau_max, delta_fact, show=show)[0]
+            if average:
+                fit_vals.append(average)
 
     return fit_vals
 
 # Purpose: list ground state value & error from a raw data table
-def getGroundState(data, mode=0):
+def getGroundState(data, mode=0, delta_fact=None):
     twoptf = jacknifeAverage(data)
     energy = effectiveEnergy(twoptf)
     err = jacknifeError2D(energy)
     vals = altFits2D(energy, err, mode=mode, delta_fact=None)
     avg = np.mean(vals)
     dev = jacknifeError1D(vals, avg=avg)
-    return (avg, dev)
+    return avg, dev
 
-# Purpose: collate average & error values across momenta
-def listGroundStates(data_tables, selected_col, mode=0):
-    momentum_points = np.zeros((2,len(data_tables)))
-    for i in range(len(data_tables)):
-        data = mergeTables(data_tables[i], col_names, selected_col)
-        momentum_points[0][i], momentum_points[1][i] = getGroundState(data, mode=mode)
+# Series of (momentum, keyword) list tuples
+def listGroundStates(p, path, col_index, mode=0, delta_fact=0.05):
+    junk_flag = False
+    ground_states = np.zeros((len(p),3))
+    
+    for i in range(len(p)):
+        file_list = searchDir(p[i][1], path=path)
+        data_table = mergeTables(file_list, col_index)
+        energy = getGroundState(data_table)
+        ground_states[i][0] = p[i][0]
+        ground_states[i][1], ground_states[i][2] = getGroundState(data_table, mode=mode, delta_fact=delta_fact)
+        
+    if junk_flag:
+        print("Data contains junk values")
+        
+    return ground_states
 
-    return momentum_points
-
-def plotDispersion(momenta, vals_by_param):
+def plotDispersion(momenta, vals_by_state):
     plot_title = "Energy vs. momentum"
+    vals_by_param = np.transpose(vals_by_state)
     x = momenta
     y = vals_by_param[0]
     e = vals_by_param[1]
