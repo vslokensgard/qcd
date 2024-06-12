@@ -1,5 +1,8 @@
 import pionkaon as pk
-pairs = [[0, ["2pt_0"]], [1, ["2pt_1"]]]
-gs = pk.listGroundStates(pairs, "./2pt_data/", 4, mode=0)
-print(gs)
-pk.plotDispersion([0,1], gs)
+
+query = "energy"
+p = [ (0, [query, "zero"]), (1, [query, "one"]), (2, [query, "two"]), (3, [query, "three"]), (4, [query, "four"]), (5, [query, "five"]) ]
+path = "./"
+col_index = 4
+ground_states = pk.listGroundStates(p, path, col_index, mode=0)
+np.savetxt("default_settings", ground_states)
