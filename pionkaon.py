@@ -1,7 +1,61 @@
+import os
 import numpy as np
-import matplotlib.pyplot as plt
 
-global junk_flag
+def momenta(path, keywords, destination, slices=64):
+    directories = os.listdir(path)
+
+    for d in directories:
+        dir_path = path + d + "/"
+        #print(dir_path)
+        dir_files = os.listdir(dir_path)
+        #print(dir_files)
+        to_average = [k for k in dir_files if any(keyword in k for keyword in keywords)]
+        tables = []
+        for a in to_average:
+            address = dir_path + a
+            tables.append(np.genfromtxt(address) / len(to_average))
+
+        if tables:
+            avg_table = np.zeros(tables[0].shape)
+            for t in tables:
+                avg_table += (t / len(tables))
+
+            np.savetxt( (destination + d), avg_table)
+
+        else:
+            continue
+
+    return
+
+def splitFiles(filenames, path=None, label="energy", lower_bound=0, upper_bound=64):
+
+    for fn in filenames:
+
+        if path:
+            address = path + fn
+        else:
+            address = fn
+
+        full_table = np.genfromtxt(address)
+        cropped_table = full_table[lower_bound:upper_bound]
+        np.savetxt( (label + fn), cropped_table)
+
+    return
+[tuu12896@login2 averaged_momenta]$ cat main.py
+import pionkaon as pk
+
+query = "energy"
+p = [ (0, [query, "zero"]), (1, [query, "one"]), (2, [query, "two"]), (3, [query, "three"]), (4, [query, "four"]), (5, [query, "five"]) ]
+path = "./"
+col_index = 4
+ground_states = pk.listGroundStates(p, path, col_index, mode=0)
+np.savetxt("default_settings", ground_states)
+[tuu12896@login2 averaged_momenta]$ cat pionkaon.py
+import numpy as np
+#import matplotlib.pyplot as plt
+import os
+
+junk_flag = False
 
 # Purpose:    extract file names containing keyword strings from a directory
 # Parameters: list of keyword strings KEYWORDS
@@ -30,7 +84,6 @@ def mergeTables(file_list, col_index):
         for i in range(len(file_list)):
                 current_file = np.genfromtxt(file_list[i])
                 by_param = np.transpose(current_file)
-                by_file[i] = by_param[col_index]
 
         by_slice = np.transpose(by_file)
         return by_slice
@@ -169,9 +222,9 @@ def jacknifeGraph(eff_energies, jack_error, err_cutoff=None, selected_bins=None)
 
     for bin_no in to_plot:
         y = energies_by_bin[bin_no][min_slice:max_slice]
-        plt.scatter(x, y)
-        plt.errorbar(x, y, yerr=jack_error, fmt="o")
-        plt.show()
+        #plt.scatter(x, y)
+        #plt.errorbar(x, y, yerr=jack_error, fmt="o")
+        #plt.show()
 
     return
 
@@ -206,6 +259,10 @@ def minSlice(ycoords, yerr, length=3):
             else:
                 i -= count
                 i += 1
+
+                if i >= num_coords:
+                    return 0
+
                 curr_max = ycoords[i] + yerr[i]
                 curr_min = ycoords[i] - yerr[i]
                 max_err = curr_max
@@ -293,22 +350,22 @@ def plotPlateauFit(ycoords, yerr, min_slice, max_slice, delta=None, show=False):
         x = range(1, len(ycoords))
         y = ycoords[1:]
         e = yerr[1:]
-        ax = plt.gca()
-        ax.set_xlim([0, max_slice])
-        point_range = np.abs(plat_fit - y[1])
-        ymin = plat_fit - (point_range * 2)
-        ymax = plat_fit + (point_range * 2)
-        ax.set_ylim(ymin, ymax)
+        #ax = plt.gca()
+        #ax.set_xlim([0, max_slice])
+        #point_range = np.abs(plat_fit - y[1])
+        #ymin = plat_fit - (point_range * 2)
+        #ymax = plat_fit + (point_range * 2)
+        #ax.set_ylim(ymin, ymax)
 
-        plt.title(plot_title)
-        plt.xlabel(plot_label)
-        plt.scatter(x, y)
-        plt.errorbar(x, y, yerr=e, fmt="o")
-        plt.axvline(x=min_slice, linestyle="dashed")
-        plt.axhline(y=plat_fit, linestyle="solid")
-        plt.axhline(y=plat_fit-plat_err, linestyle=":")
-        plt.axhline(y=plat_fit+plat_err, linestyle=":")
-        plt.show()
+        #plt.title(plot_title)
+        #plt.xlabel(plot_label)
+        #plt.scatter(x, y)
+        #plt.errorbar(x, y, yerr=e, fmt="o")
+        #plt.axvline(x=min_slice, linestyle="dashed")
+        #plt.axhline(y=plat_fit, linestyle="solid")
+        #plt.axhline(y=plat_fit-plat_err, linestyle=":")
+        #plt.axhline(y=plat_fit+plat_err, linestyle=":")
+        #plt.show()
 
     return [plat_fit, plat_err]
 
@@ -403,7 +460,7 @@ def altFits1D(coords, err, static_bound, varied_bound, frac_delta=None, show=Fal
 #             optional boolean parameters VARY_MAX, if true then vary the maximum slice index
 #             optional number DELTA_FACT representing the minimum error window as a percentage of the average value
 # Returns:    list storing non-null results of altFits1D() for the selected bins
-def altFits2D(binned, err, show=False, mode=0, selected_bins=None, length=3, max_fact=10, delta_fact=None):
+def altFits2D(binned, err, show=False, mode=1, selected_bins=None, length=3, max_fact=10, delta_fact=None):
     sort_by_bin = np.transpose(binned)
 
     if selected_bins:
@@ -428,7 +485,7 @@ def altFits2D(binned, err, show=False, mode=0, selected_bins=None, length=3, max
             average = altFits1D(bin_data, err, plateau_min, plateau_max, delta_fact, show=show)[0]
             if average: fit_vals.append(average)
 
-    return np.array(fit_vals)
+    return fit_vals
 
 # Purpose:    list ground state value & error from a raw data table
 # Parameters: 2D NumPy array representing the raw data, where rows represent timeslices and columns represent configurations
@@ -443,14 +500,21 @@ def altFits2D(binned, err, show=False, mode=0, selected_bins=None, length=3, max
 #             optional number DELTA_FACT, the minimum margin of error for testing alternate fits as a multiple of the average
 def getGroundState(data, show=False, mode=1, selected_bins=None, length=3, max_fact=10, delta_fact=0.05):
     twoptf = jacknifeAverage(data)
+    #np.savetxt("binned_data", twoptf)
+    #twoptf = np.loadtxt("binned_data")
     energy = effectiveEnergy(twoptf)
+    #np.savetxt("energies", energy)
+    #energy = np.loadtxt("energies")
     err = jacknifeError2D(energy)
+    #np.savetxt("errors", err)
+    err = np.loadtxt("errors")
     vals = altFits2D(energy, err, show=show, mode=mode, selected_bins=selected_bins, length=length, max_fact=max_fact, delta_fact=delta_fact)
 
     if junk_flag:
         print("Warning: data contains junk values")
 
     if vals:
+        val_array = np.array(vals)
         avg = np.mean(vals)
         dev = jacknifeError1D(vals, avg=avg)
     else:
@@ -470,14 +534,18 @@ def getGroundState(data, show=False, mode=1, selected_bins=None, length=3, max_f
 #                 column 2 represents its jacknife error;
 #                 columns 1 and 2 are set to None if data contains junk values or calculations failed
 def listGroundStates(p, path, col_index, show=False, mode=1, selected_bins=None, length=3, max_fact=10, delta_fact=0.05):
-    junk_flag = False
+    #junk_flag = False
     ground_states = np.zeros((len(p),3))
 
     for i in range(len(p)):
         file_list = searchDir(p[i][1], path=path)
+        #np.savetxt("file_list", file_list)
         data_table = mergeTables(file_list, col_index)
+        print(data_table)
+        #np.savetxt("merged_data", data_table)
         ground_states[i][0] = p[i][0]
         avg, dev = getGroundState(data_table, mode=mode, delta_fact=delta_fact)
+
         if avg and dev:
             ground_states[i][1] = avg
             ground_states[i][2] = dev
@@ -491,19 +559,19 @@ def listGroundStates(p, path, col_index, show=False, mode=1, selected_bins=None,
 # Parameters: 2D NumPy array VALS_BY_STATE returned by listGroundStates()
 #             string SAVE_AS, path and file name where the dispersion relation plot will be saved
 # Returns:    void, dispersion relation plot and fit function saved to an external file
-def plotDispersion(vals_by_state, save_as):
-    if not vals_by_state:
-        return None
-    for i in range(len(vals_by_state)):
-        x[i], y[i], e[i] = vals_by_state[i]
-
-    fit = np.polyfit(x, y, 2)
-    fit_func = np.poly1d(fit)
-    polyline = np.linspace(0, len(momenta), 100)
-    plt.scatter(x, y)
-    plt.errorbar(x, y, yerr=e, fmt="o")
-    plt.plot(polyline, fit_func(polyline))
-    plt.xlabel(str(fit_func))
-
-    plt.savefig(save_as)
-    return
+#def plotDispersion(vals_by_state, save_as):
+#    if not vals_by_state:
+#        return None
+#    for i in range(len(vals_by_state)):
+#        x[i], y[i], e[i] = vals_by_state[i]
+#
+#    fit = np.polyfit(x, y, 2)
+#    fit_func = np.poly1d(fit)
+#    polyline = np.linspace(0, len(momenta), 100)
+#    plt.scatter(x, y)
+#    plt.errorbar(x, y, yerr=e, fmt="o")
+#    plt.plot(polyline, fit_func(polyline))
+#    plt.xlabel(str(fit_func))
+#
+#    plt.savefig(save_as)
+#    return
