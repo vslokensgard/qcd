@@ -41,3 +41,23 @@ def splitFiles(filenames, path=None, label="energy", lower_bound=0, upper_bound=
         np.savetxt( (label + fn), cropped_table)
 
     return
+
+def fold(filenames, path=None, label="folded", lower_bound=0, upper_bound=64):
+
+    for fn in filenames:
+        if path:
+            address = path + fn
+        else:
+            address = fn
+        current = np.genfromtxt(address)
+        rows = int((upper_bound - lower_bound) / 2)
+        cols = current.shape[1]
+        folded = np.zeros( (rows, cols))
+        upper_bound -= 1
+
+        for i in range(rows):
+            for j in range(cols):
+                folded[i][j] = (current[i][j] + current[upper_bound-i][j]) / 2
+        np.savetxt( (label + fn), folded)
+
+    return
