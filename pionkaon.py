@@ -1,17 +1,3 @@
-import pionkaon as pk
-
-p = [ (0, ["zero"]), (1, ["one"]), (2, ["two"]), (3, ["three"]), (4, ["four"]), (5, ["five"]) ]
-path = "./"
-col_index = 4
-set_mins = [9, 10, 6, 6, 6, 6]
-set_maxs = [14, 20, 9, 11, 11, 10]
-read_from = "data-files/data-energy/"
-save_to = "export/"
-pk.exportBins(p, col_index, read_from, save_to, debug=True)
-#ground_states = pk.listGroundStates(p, "data-energy/", col_index, mode=1)
-#ground_states = pk.listGroundStates(p, "data-energy/", col_index, mode=0, set_mins=set_mins, set_maxs=set_maxs)
-[tuu12896@login2 tuu12896]$ clear
-[tuu12896@login2 tuu12896]$ cat pionkaon.py
 import numpy as np
 import os
 
@@ -513,7 +499,7 @@ def bin3D(raw_data_bin):
                 current_cell = (summed_1D - raw_bin_1D[z]) / (z_length - 1)
                 finished_1D[z] = current_cell
             finished_2D[y] = finished_1D
-         binned_data[x] = finished_2D
+        binned_data[x] = finished_2D
 
     return binned_data
 

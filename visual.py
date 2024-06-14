@@ -1,8 +1,16 @@
+import numpy as np
+import matplotlib.pyplot as plt
+import pionkaon as pk
+
 # Purpose:    plot and quadratic-fit a set of momenta with their average energies and error
 # Parameters: 2D NumPy array VALS_BY_STATE returned by listGroundStates()
 #             string SAVE_AS, path and file name where the dispersion relation plot will be saved
 # Returns:    void, dispersion relation plot and fit function saved to an external file
-def plotDispersion(vals_by_state, save_as):
+def plotDispersion(vals_by_state, save_as=None):
+    states = len(vals_by_state)
+    x = np.empty(states)
+    y = np.empty(states)
+    e = np.empty(states)
     if not vals_by_state:
         return None
     for i in range(len(vals_by_state)):
@@ -16,7 +24,8 @@ def plotDispersion(vals_by_state, save_as):
     plt.plot(polyline, fit_func(polyline))
     plt.xlabel(str(fit_func))
 
-    plt.savefig(save_as)
+    if save_as: plt.savefig(save_as)
+    plt.show()
     return
 
 # Purpose:    calculate & display bin values, jacknife errors, and plateau fit
@@ -78,7 +87,7 @@ def jacknifeGraph(eff_energies, jack_error, err_cutoff=None, selected_bins=None)
     num_bins, num_intervals = energies_by_bin.shape
     min_slice = 1
     if err_cutoff:
-        max_slice = maxSlice(jack_error, err_cutoff)
+        max_slice = pk.maxSlice(jack_error, err_cutoff)
     else:
         max_slice = num_intervals
 
