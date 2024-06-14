@@ -1,3 +1,17 @@
+import pionkaon as pk
+
+p = [ (0, ["zero"]), (1, ["one"]), (2, ["two"]), (3, ["three"]), (4, ["four"]), (5, ["five"]) ]
+path = "./"
+col_index = 4
+set_mins = [9, 10, 6, 6, 6, 6]
+set_maxs = [14, 20, 9, 11, 11, 10]
+read_from = "data-files/data-energy/"
+save_to = "export/"
+pk.exportBins(p, col_index, read_from, save_to, debug=True)
+#ground_states = pk.listGroundStates(p, "data-energy/", col_index, mode=1)
+#ground_states = pk.listGroundStates(p, "data-energy/", col_index, mode=0, set_mins=set_mins, set_maxs=set_maxs)
+[tuu12896@login2 tuu12896]$ clear
+[tuu12896@login2 tuu12896]$ cat pionkaon.py
 import numpy as np
 import os
 
@@ -25,7 +39,7 @@ def searchDir(keywords, path=None):
 # Returns:    NumPy table of input data
 #             Columns represent input files
 #             Rows represent time slices
-def mergeTables(file_list, col_index):
+def mergeTables(file_list, col_index, debug=False):
         by_file = np.zeros((len(file_list),time_slices))
         rows_to_delete = []
 
@@ -37,7 +51,7 @@ def mergeTables(file_list, col_index):
             if len(current_row) != time_slices:
                 junk_flag = True
                 rows_to_delete.append(i)
-                print("Selected column of file",i,"has length",len(current_row))
+                if debug: print("Selected column of file",i,"has length",len(current_row))
                 continue
 
             current_row = np.nan_to_num(current_row)
@@ -46,13 +60,13 @@ def mergeTables(file_list, col_index):
             else:
                 junk_flag = True
                 rows_to_delete.append(i)
-                print("Selected column of file",i,"contains junk values")
+                if debug: print("Selected column of file",i,"contains junk values")
                 continue
 
         if rows_to_delete:
             to_delete = np.array(rows_to_delete)
             by_file = np.delete(by_file, to_delete, axis=0)
-            print("Invalid configurations deleted")
+            if debug: print("Invalid configurations deleted")
 
         by_slice = np.transpose(by_file)
         if np.all(by_slice):
@@ -104,7 +118,7 @@ def effectiveEnergy(bins, debug=False):
                 exit()
             quo = num / den
             if quo <= 0:
-                print("Could not take log for bin no.",bin_no,"on interval",int_no)
+                if debug: print("Could not take log for bin no.",bin_no,"on interval",int_no)
                 out_by_bin[bin_no][int_no] = 0
             else:
                 out_by_bin[bin_no][int_no] = np.log(in_by_bin[bin_no][int_no] / in_by_bin[bin_no][int_no+1])
@@ -153,7 +167,7 @@ def jacknifeError2D(binned_data, rho=None, debug=False):
             sigma += np.square(diff)
 
         if bins_used == 0:
-            print("No valid data for slice",slice_no)
+            if debug: print("No valid data for slice",slice_no)
             delta_rho[slice_no] = 0
         else:
             m_factor = (bins_used - 1) / bins_used
@@ -165,63 +179,27 @@ def jacknifeError2D(binned_data, rho=None, debug=False):
 # Parameters: 1D Numpy array of error values JACKNIFE_ERR
 #             number MAX_FACT, product with the error of index 1 of JACKNIFE_ERR will set the threshold
 # Returns:    index of first value in JACKNIFE_ERR greater than the threshold, or 5, whichever is larger
-def maxSlice(jacknife_err, max_fact):
+def maxSlice(jacknife_err, max_fact, set_max=None):
+    if set_max: return set_max
     starting_length = len(jacknife_err)
     err_threshold = jacknife_err[1] * max_fact
 
     for i in range(1, starting_length):
         if not jacknife_err[i]:
-            i -=1
+            i -= 1
             break
         if jacknife_err[i] > err_threshold:
             break
 
-    if i < 5:
-        i = 5
-
-    #return i
-    return 16
-
-# Purpose:    graph effective energy values with jacknife error for each bin
-# Parameters: 2D NumPy array EFF_ENERGIES:
-#             rows represent timeslices,
-#             columns represent bins;
-#             1D NumPy array JACK_ERROR:
-#             represents error values associated with each bin value
-#             number ERR_CUTOFF representing max error as a factor of the error of JACK_ERROR[1]
-#             list of integers SELECTED_BINS, if not None then only graph listed indeces
-# Returns:    void
-def jacknifeGraph(eff_energies, jack_error, err_cutoff=None, selected_bins=None):
-    energies_by_bin = np.transpose(eff_energies)
-    num_bins, num_intervals = energies_by_bin.shape
-    min_slice = 1
-    if err_cutoff:
-        max_slice = maxSlice(jack_error, err_cutoff)
-    else:
-        max_slice = num_intervals
-
-    x = range(min_slice, max_slice)
-    jack_error = jack_error[min_slice:max_slice]
-
-    if selected_bins:
-        to_plot = selected_bins
-    else:
-        to_plot = list(range(num_bins))
-
-    for bin_no in to_plot:
-        y = energies_by_bin[bin_no][min_slice:max_slice]
-        #plt.scatter(x, y)
-        #plt.errorbar(x, y, yerr=jack_error, fmt="o")
-        #plt.show()
-
-    return
+    return i
 
 # Purpose:    identify the start indexes of plateaus of a given length, excluding index 0
 # Parameters: 1D NumPy array representing the bin values for each timeslice YCOORDS
 #             1D NumPy array representing jacknife errors for each timeslice YERR
 #             optional number LENGTH representing minimum length of the plateau
 # Returns:    start index of the plateau, 0 if no plateau is found
-def minSlice(ycoords, yerr, length=3):
+def minSlice(ycoords, yerr, length=3, set_min=None):
+    if set_min: return set_min
     num_coords = len(ycoords)
     i = 1
     count = 0
@@ -303,12 +281,12 @@ def jacknifeError1D(rhos, avg=None):
 #             None if the selected data contains junk values
 def getPlateauFit(ycoords, yerr, min_slice, max_slice):
     if not np.all(yerr[min_slice:max_slice]):
-        print("No calculable fit for indexes",min_slice,"to",max_slice)
+        if debug: print("No calculable fit for indexes",min_slice,"to",max_slice)
         return 0
     num = np.sum(ycoords[min_slice:max_slice] * np.power(yerr[min_slice:max_slice], -2))
     den = np.sum(np.power(yerr[min_slice:max_slice], -2))
     if not den:
-        print("No calculable fit for indexes",min_slice,"to",max_slice)
+        if debug: print("No calculable fit for indexes",min_slice,"to",max_slice)
         return 0
     quo = num/den
     return quo
@@ -327,11 +305,10 @@ def altFits1D(coords, err, static_bound, varied_bound, frac_delta=None, show=Fal
         if not rho_bar:
             return 0
         delta_e = jacknifeError1D(coords[varied_bound:static_bound], avg=rho_bar)
+        bound = delta_e
         if frac_delta:
-            if (delta_e/rho_bar < frac_delta):
+            if delta_e/rho_bar < frac_delta:
                 bound = rho_bar * frac_delta
-        else:
-            bound = delta_e
 
         while varied_bound > 0:
             next_slice = varied_bound - 1
@@ -351,10 +328,10 @@ def altFits1D(coords, err, static_bound, varied_bound, frac_delta=None, show=Fal
         if not rho_bar:
             return 0
         delta_e = jacknifeError1D(coords[varied_bound:static_bound], avg=rho_bar)
-        if (delta_e/rho_bar < frac_delta):
-            bound = rho_bar * frac_delta
-        else:
-            bound = delta_e
+        bound = delta_e
+        if frac_delta:
+            if delta_e/rho_bar < frac_delta:
+                bound = rho_bar * frac_delta
 
         while varied_bound < len(coords):
             next_slice = varied_bound + 1
@@ -379,7 +356,7 @@ def altFits1D(coords, err, static_bound, varied_bound, frac_delta=None, show=Fal
 #             optional boolean parameters VARY_MAX, if true then vary the maximum slice index
 #             optional number DELTA_FACT representing the minimum error window as a percentage of the average value
 # Returns:    list storing non-null results of altFits1D() for the selected bins
-def altFits2D(binned, err, debug=False, show=False, mode=1, selected_bins=None, length=3, max_fact=10, delta_fact=None):
+def altFits2D(binned, err, debug=False, set_min=None, set_max=None, show=False, mode=1, selected_bins=None, length=3, max_fact=10, delta_fact=None):
     if debug: print("altFits2D()")
     sort_by_bin = np.transpose(binned)
     fit_vals = []
@@ -391,8 +368,9 @@ def altFits2D(binned, err, debug=False, show=False, mode=1, selected_bins=None, 
 
     for bin_no in to_plot:
         bin_data = sort_by_bin[bin_no]
-        plateau_min = minSlice(bin_data, err, length=length)
-        plateau_max = maxSlice(err, max_fact=max_fact)
+        plateau_min = minSlice(bin_data, err, length=length, set_min=set_min)
+        if debug: print(plateau_min)
+        plateau_max = maxSlice(err, max_fact=max_fact, set_max=set_max)
 
         if mode == 0:
             average = fit_vals.append(getPlateauFit(bin_data, err, plateau_min, plateau_max))
@@ -408,7 +386,7 @@ def altFits2D(binned, err, debug=False, show=False, mode=1, selected_bins=None, 
         if debug: print("Successfully calculated plateau fits")
         fit_vals = np.array(fit_vals)
     else:
-        if debug: print("Error calculating plateau fits, exiting")
+        print("Error calculating plateau fits, exiting")
         exit()
 
     return fit_vals
@@ -424,34 +402,33 @@ def altFits2D(binned, err, debug=False, show=False, mode=1, selected_bins=None, 
 #             optional int LENGTH, representing the minimum length of a plateau
 #             optional number MAX_FACT representing the error cutoff for the maximum slice as a multiple of the error for index 1 of its bin
 #             optional number DELTA_FACT, the minimum margin of error for testing alternate fits as a multiple of the average
-def getGroundState(data, debug=False, show=False, mode=1, selected_bins=None, length=3, max_fact=10, delta_fact=0.05):
+def getGroundState(data, debug=False, show=False, mode=1, set_min=None, set_max=None, selected_bins=None, length=3, max_fact=10, delta_fact=0.05):
     if debug: print("getGroundState()")
     twoptf = np.nan_to_num(jacknifeAverage(data))
     if np.all(twoptf):
         if debug: print("All jacknife bin values are nonzero")
     else:
-        print("Jacknife bins contain zero values, exiting")
+        if debug: print("Jacknife bins contain zero values, exiting")
         exit()
 
     energy = np.nan_to_num(effectiveEnergy(twoptf, debug=False))
     if np.all(energy):
         if debug: print("All effective energy values are valid")
     else:
-        print("Invalid effective energy entries")
+        if debug: print("Invalid effective energy entries")
 
-    err = np.nan_to_num(jacknifeError2D(energy, debug=True))
+    err = np.nan_to_num(jacknifeError2D(energy, debug=False))
     if np.all(err):
         if debug: print("Jacknife error values are valid")
     else:
-        print("Invalid jacknife error values")
+        if debug: print("Invalid jacknife error values")
 
-    vals = altFits2D(energy, err, show=show, mode=mode, selected_bins=selected_bins, length=length, max_fact=max_fact, delta_fact=delta_fact)
+    vals = altFits2D(energy, err, debug=False, show=show, set_min=set_min, set_max=set_max, mode=mode, selected_bins=selected_bins, length=length, max_fact=max_fact, delta_fact=delta_fact)
     val_array = np.array(vals)
     avg = np.mean(val_array)
     dev = jacknifeError1D(val_array, avg=avg)
 
     return avg, dev
-#    return
 
 # Purpose:    wrapper function for getGroundState() to find ground states for multiple momentum values
 # Parameters: list of tuples P:
@@ -464,15 +441,24 @@ def getGroundState(data, debug=False, show=False, mode=1, selected_bins=None, le
 #                 column 1 represents its average value;
 #                 column 2 represents its jacknife error;
 #                 columns 1 and 2 are set to None if data contains junk values or calculations failed
-def listGroundStates(p, path, col_index, debug=False, show=False, mode=1, selected_bins=None, length=3, max_fact=10, delta_fact=0.05):
+def listGroundStates(p, path, col_index, save_as=None, set_mins=None, set_maxs=None, debug=False, mode=1, selected_bins=None, length=3, max_fact=10, delta_fact=0.05):
     ground_states = np.zeros((len(p),3))
 
     for i in range(len(p)):
+        if debug: print(i)
         file_list = searchDir(p[i][1], path=path)
         if debug: print(file_list,"end files for momentum",p[i][0])
         data_table = mergeTables(file_list, col_index)
         ground_states[i][0] = p[i][0]
-        avg, dev = getGroundState(data_table, debug=True, mode=mode, delta_fact=delta_fact)
+        if set_mins:
+            set_min=set_mins[i]
+        else:
+            set_min=None
+        if set_maxs:
+            set_max=set_maxs[i]
+        else:
+            set_max=None
+        avg, dev = getGroundState(data_table, debug=False, set_min=set_min, set_max=set_max, mode=mode, delta_fact=delta_fact, max_fact=max_fact)
 
         if avg and dev:
             ground_states[i][1] = avg
@@ -480,27 +466,86 @@ def listGroundStates(p, path, col_index, debug=False, show=False, mode=1, select
         else:
             ground_states[i][1] = None
             ground_states[i][2] = None
-        np.savetxt("ground-states", ground_states)
 
+    if save_as:
+        np.savetxt(save_as, ground_states)
+    print(ground_states)
     return avg, dev
 
-# Purpose:    plot and quadratic-fit a set of momenta with their average energies and error
-# Parameters: 2D NumPy array VALS_BY_STATE returned by listGroundStates()
-#             string SAVE_AS, path and file name where the dispersion relation plot will be saved
-# Returns:    void, dispersion relation plot and fit function saved to an external file
-#def plotDispersion(vals_by_state, save_as):
-#    if not vals_by_state:
-#        return None
-#    for i in range(len(vals_by_state)):
-#        x[i], y[i], e[i] = vals_by_state[i]
-#
-#    fit = np.polyfit(x, y, 2)
-#    fit_func = np.poly1d(fit)
-#    polyline = np.linspace(0, len(momenta), 100)
-#    plt.scatter(x, y)
-#    plt.errorbar(x, y, yerr=e, fmt="o")
-#    plt.plot(polyline, fit_func(polyline))
-#    plt.xlabel(str(fit_func))
-#
-#    plt.savefig(save_as)
-#    return
+def exportBins(p_keywords, col_index, read_from, save_to, debug=False):
+
+    for i in range(len(p_keywords)):
+        p = p_keywords[i][0]
+        keywords = p_keywords[i][1]
+        file_list = searchDir(keywords, path=read_from)
+        data_table = mergeTables(file_list, col_index)
+        binned = jacknifeAverage(data_table)
+        if debug: print (binned.shape)
+        destination = save_to + "momentum" + str(p)
+        np.savetxt(destination, binned)
+
+    return
+
+def bin4D(raw_data_table):
+    finished_bins = np.empty(raw_data_table.size)
+    total_bins = len(finished_bins)
+
+    for b in range(total_bins):
+        finished_bins[b] = bin3D(raw_data_table[b])
+
+    return finished_bins
+
+def bin3D(raw_data_bin):
+    x_length, y_length, z_length = raw_data_bin.size
+    binned_data = np.empty(raw_data_bin.size)
+
+    for x in x_length:
+# TODO ask if by-array adds improve runtime
+        raw_bin_2D = binned_data[x]
+        finished_2D = binned_data[x]
+
+        for y in y_length:
+            raw_bin_1D = bin_2D[y]
+            finished_1D = finished_2D[y]
+            summed_1D = np.sum(bin_1D)
+
+            for z in z_len:
+                current_cell = (summed_1D - raw_bin_1D[z]) / (z_length - 1)
+                finished_1D[z] = current_cell
+            finished_2D[y] = finished_1D
+         binned_data[x] = finished_2D
+
+    return binned_data
+
+def matrixElement(by_slice_3pt_pf, by_slice_2pt, by_slice_3pt_pi=None):
+    by_bin_3pt_pf = np.transpose(by_slice_3pt_pf)
+    by_bin_2pt = np.transpose(by_slice_2pt)
+# can swap num_ins with num_zs
+    num_bins, num_sinks, num_ins, num_z = by_bin_3pt_pf.shape
+    r0_by_bin = np.empty(by_bin_3pt_pf.shape)
+
+    for bin_no in range(num_bins):
+        by_sink_3pt_pf = by_bin_3pt_pf[bin_no]
+        by_slice_2pt = by_bin_2pt[bin_no]
+        binned_sinks = np.empty( (num_sinks, num_ins, num_z) )
+        for sink_no in num_sinks:
+            c_2pt = by_slice_2pt[sink_no]
+            by_ins_pf = by_sink_3pt_pf[sink_no]
+            binned_ins = np.empty( (num_ins, num_z) )
+
+            for ins_no in num_ins:
+                by_z_pf = by_ins[ins_no]
+                binned_z = np.empty(num_z)
+
+                for z in num_z:
+                    if by_slice_3pt_pi:
+                        print("Not implemented")
+                    else:
+                        c_3pt = by_z[z]
+                    r_0 = c_2pt / c_3pt
+                    binned_z[z] = r_0
+                binned_ins[ins_no] = binned_z
+            binned_sinks[sink_no] = binned_ins
+        r0_by_bin[bin_no] = binned_sinks
+
+    return r0_by_bin
